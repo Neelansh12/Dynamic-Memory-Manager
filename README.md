@@ -1,6 +1,5 @@
 # Dynamic-Memory-Manager
 
-# Memory Management Visualizer 🚀
 
 An interactive and fully-featured web-based visualizer for understanding memory management techniques like **FIFO** and **LRU** page replacement algorithms.
 
