@@ -93,6 +93,7 @@
     <br />
     <button onclick="startSimulation('FIFO')">Run FIFO</button>
     <button onclick="startSimulation('LRU')">Run LRU</button>
+    <button onclick="startSimulation('OPTIMAL')">Run Optimal</button>
     <button onclick="nextStep()">Next Step</button>
     <button onclick="terminateSimulation()">Terminate</button>
     <button onclick="exportLog()">Export Log to PDF</button>
@@ -220,35 +221,61 @@
     }
 
     async function runStep() {
-      const { pages, frames, history, type } = simulationData;
-      const page = pages[simulationData.currentIndex];
-      playBeep();
-      updateProgress(simulationData.currentIndex + 1, pages.length);
+  const { pages, frames, history, type } = simulationData;
+  const page = pages[simulationData.currentIndex];
+  playBeep();
+  updateProgress(simulationData.currentIndex + 1, pages.length);
 
-      if (frames.includes(page)) {
-        log(`✅ Page ${page} hit.`);
-        simulationData.pageHits++;
-        if (type === 'LRU') {
-          simulationData.history = history.filter(p => p !== page);
-          simulationData.history.push(page);
-        }
-      } else {
-        log(`❌ Page ${page} fault.`);
-        simulationData.pageFaults++;
-        if (frames.includes(null)) {
-          frames[frames.indexOf(null)] = page;
+  if (frames.includes(page)) {
+    log(`✅ Page ${page} hit.`);
+    simulationData.pageHits++;
+    if (type === 'LRU') {
+      simulationData.history = history.filter(p => p !== page);
+      simulationData.history.push(page);
+    }
+  } else {
+    log(`❌ Page ${page} fault.`);
+    simulationData.pageFaults++;
+    if (frames.includes(null)) {
+      frames[frames.indexOf(null)] = page;
+    } else {
+      let removePage;
+
+      if (type === 'FIFO') {
+        removePage = history.shift();
+      } else if (type === 'LRU') {
+        removePage = history.shift();
+      } else if (type === 'OPTIMAL') {
+        // Optimal logic
+        const future = pages.slice(simulationData.currentIndex + 1);
+        let indices = frames.map(f => ({
+          page: f,
+          index: future.indexOf(f)
+        }));
+
+        let pageToRemove;
+        if (indices.some(obj => obj.index === -1)) {
+          // Remove page not used again
+          pageToRemove = indices.find(obj => obj.index === -1).page;
         } else {
-          const removePage = type === 'FIFO' ? history.shift() : history.shift();
-          const index = frames.indexOf(removePage);
-          frames[index] = page;
+          // Remove page used farthest in future
+          pageToRemove = indices.reduce((a, b) => a.index > b.index ? a : b).page;
         }
-        simulationData.history.push(page);
+        removePage = pageToRemove;
       }
 
-      updateFrames(frames);
-      updateChart(simulationData.pageHits, simulationData.pageFaults);
-      simulationData.currentIndex++;
+      const index = frames.indexOf(removePage);
+      frames[index] = page;
     }
+
+    simulationData.history.push(page);
+  }
+
+  updateFrames(frames);
+  updateChart(simulationData.pageHits, simulationData.pageFaults);
+  simulationData.currentIndex++;
+}
+
 
     function finishSimulation() {
       log('<br>Simulation Complete! 🎉');
