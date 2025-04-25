@@ -85,6 +85,7 @@
     <input type="number" id="frameSize" value="3" min="1" />
     <label>Speed (ms): </label>
     <input type="number" id="speed" value="1000" min="100" />
+    <br />
     <label>Mode: </label>
     <select id="mode">
       <option value="auto">Auto</option>
@@ -97,6 +98,8 @@
     <button onclick="nextStep()">Next Step</button>
     <button onclick="terminateSimulation()">Terminate</button>
     <button onclick="exportLog()">Export Log to PDF</button>
+    <button onclick="showPageTable()">Show Page Table</button>
+    <button onclick="resetSimulation()">Reset Simulation</button>
   </div>
 
   <div class="frames" id="frames"></div>
@@ -221,61 +224,57 @@
     }
 
     async function runStep() {
-  const { pages, frames, history, type } = simulationData;
-  const page = pages[simulationData.currentIndex];
-  playBeep();
-  updateProgress(simulationData.currentIndex + 1, pages.length);
+      const { pages, frames, history, type } = simulationData;
+      const page = pages[simulationData.currentIndex];
+      playBeep();
+      updateProgress(simulationData.currentIndex + 1, pages.length);
 
-  if (frames.includes(page)) {
-    log(`✅ Page ${page} hit.`);
-    simulationData.pageHits++;
-    if (type === 'LRU') {
-      simulationData.history = history.filter(p => p !== page);
-      simulationData.history.push(page);
-    }
-  } else {
-    log(`❌ Page ${page} fault.`);
-    simulationData.pageFaults++;
-    if (frames.includes(null)) {
-      frames[frames.indexOf(null)] = page;
-    } else {
-      let removePage;
-
-      if (type === 'FIFO') {
-        removePage = history.shift();
-      } else if (type === 'LRU') {
-        removePage = history.shift();
-      } else if (type === 'OPTIMAL') {
-        // Optimal logic
-        const future = pages.slice(simulationData.currentIndex + 1);
-        let indices = frames.map(f => ({
-          page: f,
-          index: future.indexOf(f)
-        }));
-
-        let pageToRemove;
-        if (indices.some(obj => obj.index === -1)) {
-          // Remove page not used again
-          pageToRemove = indices.find(obj => obj.index === -1).page;
-        } else {
-          // Remove page used farthest in future
-          pageToRemove = indices.reduce((a, b) => a.index > b.index ? a : b).page;
+      if (frames.includes(page)) {
+        log(`✅ Page ${page} hit.`);
+        simulationData.pageHits++;
+        if (type === 'LRU') {
+          simulationData.history = history.filter(p => p !== page);
+          simulationData.history.push(page);
         }
-        removePage = pageToRemove;
+      } else {
+        log(`❌ Page ${page} fault.`);
+        simulationData.pageFaults++;
+        if (frames.includes(null)) {
+          frames[frames.indexOf(null)] = page;
+        } else {
+          let removePage;
+
+          if (type === 'FIFO') {
+            removePage = history.shift();
+          } else if (type === 'LRU') {
+            removePage = history.shift();
+          } else if (type === 'OPTIMAL') {
+            const future = pages.slice(simulationData.currentIndex + 1);
+            let indices = frames.map(f => ({
+              page: f,
+              index: future.indexOf(f)
+            }));
+
+            let pageToRemove;
+            if (indices.some(obj => obj.index === -1)) {
+              pageToRemove = indices.find(obj => obj.index === -1).page;
+            } else {
+              pageToRemove = indices.reduce((a, b) => a.index > b.index ? a : b).page;
+            }
+            removePage = pageToRemove;
+          }
+
+          const index = frames.indexOf(removePage);
+          frames[index] = page;
+        }
+
+        simulationData.history.push(page);
       }
 
-      const index = frames.indexOf(removePage);
-      frames[index] = page;
+      updateFrames(frames);
+      updateChart(simulationData.pageHits, simulationData.pageFaults);
+      simulationData.currentIndex++;
     }
-
-    simulationData.history.push(page);
-  }
-
-  updateFrames(frames);
-  updateChart(simulationData.pageHits, simulationData.pageFaults);
-  simulationData.currentIndex++;
-}
-
 
     function finishSimulation() {
       log('<br>Simulation Complete! 🎉');
@@ -285,7 +284,7 @@
 
     function terminateSimulation() {
       simulationPaused = true;
-      simulationData.currentIndex = simulationData.pages.length; // Skip to the end
+      simulationData.currentIndex = simulationData.pages.length;
       log('<br>Simulation Terminated.');
     }
 
@@ -297,6 +296,26 @@
         doc.text(line, 10, 10 + i * 10);
       });
       doc.save('memory_simulation_log.pdf');
+    }
+
+    function showPageTable() {
+      const { frames } = simulationData;
+      let tableLog = '<br>📋 Page Table:<br>';
+      frames.forEach((page, index) => {
+        tableLog += `Frame ${index}: ${page !== null ? page : '-'}<br>`;
+      });
+      log(tableLog);
+    }
+
+    function resetSimulation() {
+      simulationData = {};
+      simulationPaused = false;
+      currentStep = 0;
+      logArea.innerHTML = '';
+      updateFrames([]);
+      updateProgress(0, 1);
+      updateChart(0, 0);
+      log('🔁 Simulation Reset. Enter new values to start again.');
     }
   </script>
 </body>
